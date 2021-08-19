@@ -37,9 +37,8 @@ void system::enable_rcc_all() {
  * @param mode see gpio::cfg_t
  * @param speed see gpio::cfg_t, ignored if input mode
  */
-template<GPIO_TypeDef* GPIO, uint8_t pin>
-void gpio::config(gpio::cfg_t mode, gpio::cfg_t speed) {
-    if constexpr(pin < 8) {
+void gpio::config(GPIO_TypeDef *GPIO, uint8_t pin, gpio::cfg_t mode, gpio::cfg_t speed) {
+    if (pin < 8) {
         MODIFY_REG(GPIO->CRL, 0xf << pin, (mode | speed) << pin);
     }
     else {
@@ -78,4 +77,28 @@ void i2c::config_for_tea(I2C_TypeDef *I2C) {
     MODIFY_REG(I2C->CCR, I2C_CCR_CCR, I2C_CCR_FS | 26); // CLK low time = 26/36MHz ~ 722ns
     I2C->TRISE = 12UL; // Maximum rise time = 300ns/36MHz ~ 11
     I2C->CR1 |= I2C_CR1_PE;
+}
+
+/**
+ * Configures all gpios needed for the project
+ * @warning specific to the alarm-clock-lamp project
+ * @see README
+ */
+void gpio::config_all() {
+    gpio::config(GPIOA, 2, gpio::OUT_PUSHPULL, gpio::SPEED_50MHZ);
+    gpio::config(GPIOA, 3, gpio::IN_PUSHPULL);
+    gpio::config(GPIOA, 4, gpio::OUT_PUSHPULL, gpio::SPEED_50MHZ);
+    gpio::config(GPIOA, 5, gpio::AF_PUSHPULL, gpio::SPEED_50MHZ);
+    gpio::config(GPIOA, 6, gpio::AF_OD, gpio::SPEED_50MHZ);
+    gpio::config(GPIOA, 7, gpio::AF_OD, gpio::SPEED_50MHZ);
+    gpio::config(GPIOA, 8, gpio::AF_PUSHPULL, gpio::SPEED_50MHZ);
+    gpio::config(GPIOA, 9, gpio::AF_PUSHPULL, gpio::SPEED_50MHZ);
+    gpio::config(GPIOA, 11, gpio::IN_PUSHPULL);
+    gpio::config(GPIOA, 12, gpio::IN_PUSHPULL);
+    gpio::config(GPIOA, 15, gpio::OUT_PUSHPULL);
+    gpio::config(GPIOB, 10, gpio::AF_OD, gpio::SPEED_50MHZ);
+    gpio::config(GPIOB, 11, gpio::AF_OD, gpio::SPEED_50MHZ);
+    gpio::exti_enable_falling_irq<gpio::BANK_A, 3>();
+    gpio::exti_enable_falling_irq<gpio::BANK_A, 11>();
+    gpio::exti_enable_falling_irq<gpio::BANK_A, 12>();
 }

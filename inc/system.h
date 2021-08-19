@@ -34,8 +34,8 @@ namespace gpio {
         BANK_C,
     };
 
-    template<GPIO_TypeDef* GPIO, uint8_t pin>
-    void config(cfg_t mode, cfg_t speed=SPEED_10MHZ);
+    void config(GPIO_TypeDef *GPIO, uint8_t pin, cfg_t mode, cfg_t speed=SPEED_10MHZ);
+    void config_all();
 
     template<bank_t bank, uint8_t pin>
     void exti_enable_falling_irq();
