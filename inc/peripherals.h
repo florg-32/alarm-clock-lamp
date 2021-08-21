@@ -76,13 +76,37 @@ namespace gpio {
 }
 
 namespace tim {
-    void enable(TIM_TypeDef *TIM);
+    void enable(TIM_TypeDef *TIM) {
+        TIM->CR1 |= TIM_CR1_CEN;
+    }
 
-    void disable(TIM_TypeDef *TIM);
+    void disable(TIM_TypeDef *TIM) {
+        TIM->CR1 &= ~TIM_CR1_CEN;
+    }
 
-    void set_period(TIM_TypeDef *TIM, uint16_t period);
+    void set_period(TIM_TypeDef *TIM, uint16_t period) {
+        TIM->ARR = period;
+    }
 
-    void config_oneshot_irq(TIM_TypeDef *TIM, uint16_t period);
+    void set_prescaler(TIM_TypeDef *TIM, uint16_t prescaler) {
+        TIM->PSC = prescaler;
+    }
+
+    void generate_update(TIM_TypeDef *TIM) {
+        TIM->EGR |= TIM_EGR_UG;
+    }
+
+    /**
+     * Configures the timer in oneshot mode and enable the update irq
+     * @param prescaler clock divisor + 1
+     */
+    void config_oneshot_irq(TIM_TypeDef *TIM, uint16_t prescaler, uint16_t period) {
+        set_period(TIM, period);
+        set_prescaler(TIM, prescaler);
+        generate_update(TIM);
+        TIM->CR1 |= TIM_CR1_OPM;
+        TIM->DIER |= TIM_DIER_UIE;
+    }
 }
 
 namespace spi {
