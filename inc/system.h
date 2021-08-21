@@ -1,54 +1,43 @@
 /**
- * Contains definitions for peripheral configuration
+ * @file system.cpp
+ * Contains project specific function for peripheral configuration
  * @author Florian Guggi
  * @date 16.08.2021
  */
 
-#ifndef ALARM_CLOCK_LAMP_SYSTEM_H
-#define ALARM_CLOCK_LAMP_SYSTEM_H
-
-#include "stm32f1xx.h"
+#include "peripherals.h"
 
 namespace system {
-    void clock_init_hse_pll_72MHz();
-    void enable_rcc_all();
+
+    /**
+     * Sets the RCC enable bits for the projects peripherals
+     */
+    void enable_all_periphs() {
+        RCC->APB1ENR |= RCC_APB1ENR_I2C2EN;
+        RCC->APB2ENR |= RCC_APB2ENR_IOPAEN | RCC_APB2ENR_IOPBEN | RCC_APB2ENR_AFIOEN | RCC_APB2ENR_SPI1EN;
+    }
+
+    /**
+     * Configures all gpios needed for the project
+     * @see README
+     */
+    void config_gpios() {
+        gpio::config(GPIOA, 2, gpio::OUT_PUSHPULL, gpio::SPEED_50MHZ);
+        gpio::config(GPIOA, 3, gpio::IN_PUSHPULL);
+        gpio::config(GPIOA, 4, gpio::OUT_PUSHPULL, gpio::SPEED_50MHZ);
+        gpio::config(GPIOA, 5, gpio::AF_PUSHPULL, gpio::SPEED_50MHZ);
+        gpio::config(GPIOA, 6, gpio::AF_OD, gpio::SPEED_50MHZ);
+        gpio::config(GPIOA, 7, gpio::AF_OD, gpio::SPEED_50MHZ);
+        gpio::config(GPIOA, 8, gpio::AF_PUSHPULL, gpio::SPEED_50MHZ);
+        gpio::config(GPIOA, 9, gpio::AF_PUSHPULL, gpio::SPEED_50MHZ);
+        gpio::config(GPIOA, 11, gpio::IN_PUSHPULL);
+        gpio::config(GPIOA, 12, gpio::IN_PUSHPULL);
+        gpio::config(GPIOA, 15, gpio::OUT_PUSHPULL);
+        gpio::config(GPIOB, 10, gpio::AF_OD, gpio::SPEED_50MHZ);
+        gpio::config(GPIOB, 11, gpio::AF_OD, gpio::SPEED_50MHZ);
+        gpio::exti_enable_falling_irq<gpio::BANK_A, 3>();
+        gpio::exti_enable_falling_irq<gpio::BANK_A, 11>();
+        gpio::exti_enable_falling_irq<gpio::BANK_A, 12>();
+    }
+
 }
-
-namespace gpio {
-    enum cfg_t {
-        IN_ANALOG = 0,
-        IN_FLOATING = 1,
-        IN_PUSHPULL = 2,
-        OUT_PUSHPULL = 0,
-        OUT_OD = 1,
-        AF_PUSHPULL = 2,
-        AF_OD = 3,
-        SPEED_2MHZ = 2,
-        SPEED_10MHZ = 1,
-        SPEED_50MHZ = 3
-    };
-
-    enum bank_t {
-        BANK_A,
-        BANK_B,
-        BANK_C,
-    };
-
-    void config(GPIO_TypeDef *GPIO, uint8_t pin, cfg_t mode, cfg_t speed=SPEED_10MHZ);
-    void config_all();
-
-    template<bank_t bank, uint8_t pin>
-    void exti_enable_falling_irq();
-}
-
-namespace spi {
-    void config_for_nrf(SPI_TypeDef* SPI);
-}
-
-namespace i2c {
-    void config_for_tea(I2C_TypeDef* I2C);
-}
-
-
-
-#endif //ALARM_CLOCK_LAMP_SYSTEM_H
