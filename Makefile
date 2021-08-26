@@ -36,5 +36,5 @@ obj/%.o: src/%.cpp
 clean:
 	del /F /Q obj\* *.elf *.bin
 
-disassemble: $(OBJS)
-	$(OBJDUMP) -S -d $< > $<.dump
+disassemble: $(TARGET).elf
+	$(OBJDUMP) -Cd $< > obj/$<.dump

@@ -30,12 +30,12 @@ namespace rcc {
 namespace gpio {
     enum cfg_t {
         IN_ANALOG = 0,
-        IN_FLOATING = 1,
-        IN_PUSHPULL = 2,
+        IN_FLOATING = 4,
+        IN_PUSHPULL = 8,
         OUT_PUSHPULL = 0,
-        OUT_OD = 1,
-        AF_PUSHPULL = 2,
-        AF_OD = 3,
+        OUT_OD = 4,
+        AF_PUSHPULL = 8,
+        AF_OD = 12,
         SPEED_2MHZ = 2,
         SPEED_10MHZ = 1,
         SPEED_50MHZ = 3
@@ -56,10 +56,18 @@ namespace gpio {
      */
     void config(GPIO_TypeDef *GPIO, uint8_t pin, gpio::cfg_t mode, gpio::cfg_t speed=SPEED_10MHZ) {
         if (pin < 8) {
-            MODIFY_REG(GPIO->CRL, 0xf << pin, (mode | speed) << pin);
+            MODIFY_REG(GPIO->CRL, 0xf << (pin*4), (mode | speed) << (pin*4));
         } else {
-            MODIFY_REG(GPIO->CRH, 0xf << pin, (mode | speed) << pin);
+            MODIFY_REG(GPIO->CRH, 0xf << ((pin-8)*4), (mode | speed) << ((pin-8)*4));
         }
+    }
+
+    void set(GPIO_TypeDef *GPIO, uint8_t pin) {
+        GPIO->BSRR = 1 << pin;
+    }
+
+    void reset(GPIO_TypeDef *GPIO, uint8_t pin) {
+        GPIO->BRR = 1 << pin;
     }
 
     /**
@@ -94,43 +102,38 @@ namespace tim {
 
     void generate_update(TIM_TypeDef *TIM) {
         TIM->EGR |= TIM_EGR_UG;
+        TIM->SR = 0;
     }
 
     /**
-     * Configures the timer in oneshot mode and enable the update irq
+     * Configures the timer in oneshot mode
      * @param prescaler clock divisor + 1
      */
-    void config_oneshot_irq(TIM_TypeDef *TIM, uint16_t prescaler, uint16_t period) {
+    void config_oneshot(TIM_TypeDef *TIM, uint16_t prescaler, uint16_t period) {
         set_period(TIM, period);
         set_prescaler(TIM, prescaler);
         generate_update(TIM);
         TIM->CR1 |= TIM_CR1_OPM;
-        TIM->DIER |= TIM_DIER_UIE;
+    }
+
+    /**
+     * This function busy waits for the specified period using a timer
+     * @warning Reset timer config before using it elsewhere
+     */
+    void blocking_delay(TIM_TypeDef *TIM, uint16_t prescaler, uint16_t period) {
+        config_oneshot(TIM, prescaler, period);
+        enable(TIM);
+        while (!(TIM->SR & TIM_SR_UIF));
+        TIM->SR = 0;
     }
 }
 
 namespace spi {
-    /**
-     * Configures the SPI for use with the NRF24L01\n
-     * Baudrate: 72/64MHz, LSB first
-     * @param SPI typedef e.g. SPI1
-     */
-    void config_for_nrf(SPI_TypeDef *SPI) {
-        SPI->CR1 = SPI_CR1_LSBFIRST | SPI_CR1_SPE | SPI_CR1_BR_2 | SPI_CR1_BR_0 | SPI_CR1_MSTR;
-    }}
+
+}
 
 namespace i2c {
-    /**
-     * Configures the I2C for use with the TEA5767\n
-     * CLK low time 722ns, high time 1444ns; max rise time 300ns
-     * @param I2C typedef e.g. I2C2
-     */
-    void config_for_tea(I2C_TypeDef *I2C) {
-        MODIFY_REG(I2C->CR2, I2C_CR2_FREQ, 36); // APB1 Freq = 36MHz
-        MODIFY_REG(I2C->CCR, I2C_CCR_CCR, I2C_CCR_FS | 26); // CLK low time = 26/36MHz ~ 722ns
-        I2C->TRISE = 12UL; // Maximum rise time = 300ns/36MHz ~ 11
-        I2C->CR1 |= I2C_CR1_PE;
-    }
+
 }
 
 
