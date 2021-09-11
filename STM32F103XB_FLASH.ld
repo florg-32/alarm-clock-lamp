@@ -34,8 +34,8 @@ ENTRY(Reset_Handler)
 _estack = 0x20004FFF;    /* end of RAM */
 
 /* Generate a link error if heap and stack don't fit into RAM */
-_Min_Heap_Size = 0x200;      /* required amount of heap  */
-_Min_Stack_Size = 0x400; /* required amount of stack */
+_Min_Heap_Size = DEFINED(min_heap) ? min_heap : 0x200;      /* required amount of heap  */
+_Min_Stack_Size = DEFINED(min_stack) ? min_stack : 0x400; /* required amount of stack */
 
 /* Specify the memory areas */
 MEMORY
@@ -67,6 +67,7 @@ SECTIONS
 
     KEEP (*(.init))
     KEEP (*(.fini))
+    KEEP (*(.text.initialise_monitor_handles))
 
     . = ALIGN(4);
     _etext = .;        /* define a global symbols at end of code */
@@ -141,7 +142,7 @@ SECTIONS
     __bss_end__ = _ebss;
   } >RAM
 
-  /* User_heap_stack section, used to check that there is enough RAM left !DISABLED!
+  /* Heap and stack. Size can be adjusted by symbol definition in Makefile */
   ._user_heap_stack :
   {
     . = ALIGN(4);
@@ -151,7 +152,6 @@ SECTIONS
     . = . + _Min_Stack_Size;
     . = ALIGN(4);
   } >RAM
-*/
   
 
   /* Remove information from the standard libraries */
@@ -160,6 +160,8 @@ SECTIONS
     libc.a ( * )
     libm.a ( * )
     libgcc.a ( * )
+    libg.a ( * )
+    libnosys.a ( * )
   }
 
   .ARM.attributes 0 : { *(.ARM.attributes) }

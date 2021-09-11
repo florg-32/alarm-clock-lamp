@@ -36,6 +36,7 @@ namespace gpio {
         OUT_OD = 4,
         AF_PUSHPULL = 8,
         AF_OD = 12,
+        SPEED_IN = 0,
         SPEED_2MHZ = 2,
         SPEED_10MHZ = 1,
         SPEED_50MHZ = 3
@@ -52,9 +53,9 @@ namespace gpio {
      * @param GPIO typedef e.g. GPIOB
      * @param pin to be set e.g. 6
      * @param mode see gpio::cfg_t
-     * @param speed see gpio::cfg_t, ignored if input mode
+     * @param speed see gpio::cfg_t, must be default or SPEED_IN for input
      */
-    void config(GPIO_TypeDef *GPIO, uint8_t pin, gpio::cfg_t mode, gpio::cfg_t speed=SPEED_10MHZ) {
+    void config(GPIO_TypeDef *GPIO, uint8_t pin, gpio::cfg_t mode, gpio::cfg_t speed=SPEED_IN) {
         if (pin < 8) {
             MODIFY_REG(GPIO->CRL, 0xf << (pin*4), (mode | speed) << (pin*4));
         } else {
@@ -123,7 +124,7 @@ namespace tim {
     void blocking_delay(TIM_TypeDef *TIM, uint16_t prescaler, uint16_t period) {
         config_oneshot(TIM, prescaler, period);
         enable(TIM);
-        while (!(TIM->SR & TIM_SR_UIF));
+        while (TIM->CNT < period);
         TIM->SR = 0;
     }
 }

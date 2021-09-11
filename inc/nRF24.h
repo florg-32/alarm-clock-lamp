@@ -8,81 +8,55 @@
 #ifndef ALARM_CLOCK_LAMP_NRF24_H
 #define ALARM_CLOCK_LAMP_NRF24_H
 
-#include "SPI_DMA_Handler.h"
+#include "SPI_Handler.h"
 
-class nRF24 : public SPI_DMA_Handler {
+class nRF24 {
+    SPI_Handler *spi_handler;
 public:
+    void set_spi_handler(SPI_Handler *handler) {
+        spi_handler = handler;
+    }
+
+    enum regs_t : uint8_t {
+        CONFIG,
+        EN_AA,
+        EN_RXADDR,
+        SETUP_AW,
+        SETUP_RETR,
+        RF_CH,
+        RF_SETUP,
+        STATUS,
+        OBSERVE_TX,
+        RPD,
+        RX_ADDR_P0,
+        RX_ADDR_P1,
+        RX_ADDR_P2,
+        RX_ADDR_P3,
+        RX_ADDR_P4,
+        RX_ADDR_P5,
+        TX_ADDR,
+        RX_PW_P0,
+        RX_PW_P1,
+        RX_PW_P2,
+        RX_PW_P3,
+        RX_PW_P4,
+        RX_PW_P5,
+        FIFO_STATUS,
+        DYNPD = 0x1c,
+        FEATURE = 0x1d
+    };
+
     enum addr_width_t : uint8_t {
         BYTE3 = 1,
         BYTE4 = 2,
         BYTE5 = 3
     };
 
-    /**
-     * Writes to the SETUP_AW register
-     */
-    void set_addr_width(addr_width_t width) {
-        uint8_t data[] = {0x23, width};
-        write_transaction(data, 2, true);
-    }
-
-    /**
-     * Sets its own read address, should conform to the set addr_width
-     * @param addr The address to set, the first byte will be ignored
-     * @param addr_length Length of the address + 1!
-     * @param pipe which data pipe should be configured
-     * @warning first byte of address will be ignored!
-     */
-    void set_rx_addr(uint8_t *addr, uint8_t addr_length, uint8_t pipe) {
-        addr[0] = 0x2a + pipe;
-        write_transaction(addr, addr_length, true);
-    }
-
-    /**
-     * Sets the tx address, should conform to the set addr_width
-     * @param addr The address to set, the first byte will be ignored
-     * @param addr_length Length of address + 1!
-     * @param pipe which data pipe should be configured
-     * @warning first byte of address will be ignored!
-     */
-    void set_tx_addr(uint8_t *addr, uint8_t addr_length) {
-        addr[0] = 0x30;
-        write_transaction(addr, addr_length, true);
-    }
-
-    /**
-     * Writes the payload length in to the RX_PW registers
-     * @param length payload length
-     * @param pipe The pipe to write to
-     */
-    void set_payload_length(uint8_t length, uint8_t pipe) {
-        uint8_t data[] = {static_cast<uint8_t>(0x31+pipe), length};
-        write_transaction(data, 2, true);
-    }
-
-    /**
-     * Write to the DYNPD register. Dont forget to enable the feature as well.
-     * @param pipes The pipes to enable e.g. 1 << 4
-     */
-    void set_dynamic_payload_length(uint8_t pipes) {
-        uint8_t data[] = {0x3c, pipes};
-        write_transaction(data, 2, true);
-    }
-
     enum feature_t : uint8_t {
         EN_DPL = 4,
         EN_ACK_PAY = 2,
         EN_DYN_ACK = 1
     };
-
-    /**
-     * Writes to the FEATURE register.
-     * @param feat see feature_t
-     */
-    void set_features(uint8_t feat) {
-        uint8_t data[] = {0x3d, feat};
-        write_transaction(data, 2, true);
-    }
 
     enum cfg_t : uint8_t {
         PRIM_RX = 1,
@@ -95,12 +69,79 @@ public:
     };
 
     /**
-     * Writes to the CONFIG register
-     * @param cfg see cfg_t
+     * Powers down the nRF and disables any pipes/features...
      */
-    void set_config(uint8_t cfg) {
-        uint8_t data[] = {0x20, cfg};
-        write_transaction(data, 2, true);
+    void reset() {
+        write_reg(CONFIG, 0x00);
+        write_reg(EN_AA, 0x00);
+        write_reg(EN_RXADDR, 0x00);
+        write_reg(SETUP_AW, 0x03);
+        write_reg(SETUP_RETR, 0x00);
+        write_reg(RF_CH, 0x00);
+        write_reg(RF_SETUP, 0x0e);
+        flush_rx();
+        flush_tx();
+        write_reg(STATUS, 0xff);
+        uint8_t addr[] = {0x00, 0xe7, 0xe7, 0xe7, 0xe7, 0xe7};
+        write_multireg(RX_ADDR_P0, addr, 6);
+        write_multireg(TX_ADDR, addr, 6);
+        for (uint8_t &b : addr) {
+            b = 0xc2;
+        }
+        write_multireg(RX_ADDR_P1, addr, 6);
+        for (uint8_t i = RX_PW_P0; i <= RX_PW_P5; i++) {
+            write_reg((regs_t) i, 0x00);
+        }
+        write_reg(DYNPD, 0x00);
+        write_reg(FEATURE, 0x00);
+    }
+
+    /**
+     * A blocking write to a nRF register
+     * @param reg The register to write to
+     * @param byte data to write
+     */
+    void write_reg(regs_t reg, uint8_t byte) {
+        uint8_t buffer[] = {static_cast<uint8_t>(reg | 1 << 5), byte};
+        spi_handler->write_transaction(buffer, 2, true);
+    }
+
+    /**
+     * A blocking write of multiple bytes to a nRF register
+     * @param reg The register to write to
+     * @param bytes An array of bytes to write, first byte will be overwritten!
+     * @param length length of bytes
+     */
+    void write_multireg(regs_t reg, uint8_t *bytes, uint8_t length) {
+        bytes[0] = reg | 1 << 5;
+        spi_handler->write_transaction(bytes, length, true);
+    }
+
+    /**
+     * A blocking read from a nRF register
+     * @param reg The register to read from
+     * @return read data
+     */
+    uint8_t read_reg(regs_t reg) {
+        uint8_t buffer[] = {reg, 0x00};
+        spi_handler->read_transaction(buffer, 2, buffer, 2, true);
+        return buffer[1];
+    }
+
+    /**
+     * Flushes the nRF TX FIFO
+     */
+    void flush_tx() {
+        uint8_t buffer = 0xe1;
+        spi_handler->write_transaction(&buffer, 1, true);
+    }
+
+    /**
+     * Flushes the nRF RX FIFO
+     */
+    void flush_rx() {
+        uint8_t buffer = 0xe2;
+        spi_handler->write_transaction(&buffer, 1, true);
     }
 
     /**
@@ -112,18 +153,39 @@ public:
      */
     void write_payload(uint8_t *payload, uint8_t payload_length, bool no_ack=false, bool blocking=true) {
         payload[0] = no_ack ? 0xb0 : 0xa0;
-        write_transaction(payload, payload_length, blocking);
+        spi_handler->write_transaction(payload, payload_length, blocking);
     }
 
     /**
-     * Reads the nRFs RX FIFO into the provided buffer. First byte will be status register
+     * Writes the provided data into the nRFs ACK payload FIFO
+     * @param payload The bytes to be sent, first will be ignored
+     * @param payload_length Length of the payload + 1!
+     * @param pipe Which pipe should send the ack payload
+     * @param blocking Whether the write should busy wait until complete
+     */
+    void write_ack_payload(uint8_t *payload, uint8_t payload_length, uint8_t pipe, bool blocking=true) {
+        payload[0] = 0xa8 | pipe;
+        spi_handler->write_transaction(payload, payload_length, blocking);
+    }
+    /**
+     * Reads the number of bytes waiting at the top of the RX FIFO
+     * @return Number of bytes in RX payload pipe
+     */
+    uint8_t get_payload_length() {
+        uint8_t buffer[] = {0x60, 0x00};
+        spi_handler->read_transaction(buffer, 2, buffer, 2, true);
+        return buffer[1];
+    }
+
+    /**
+     * Reads the nRFs RX FIFO into the provided buffer. First byte will be status register, use in RX mode
      * @param buffer A byte array
      * @param buffer_length The buffers size/bytes to read
      * @param blocking Whether the read should busy wait until complete
      */
     void read_payload(uint8_t *buffer, uint8_t buffer_length, bool blocking=true) {
         buffer[0] = 0x61;
-        read_transaction(buffer, buffer_length, buffer, buffer_length, blocking);
+        spi_handler->read_transaction(buffer, buffer_length, buffer, buffer_length, blocking);
     }
 };
 

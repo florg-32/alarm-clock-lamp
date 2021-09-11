@@ -23,8 +23,10 @@ namespace system {
      * @see README
      */
     void config_gpios() {
+        gpio::reset(GPIOA, 2);
         gpio::config(GPIOA, 2, gpio::OUT_PUSHPULL, gpio::SPEED_50MHZ);
         gpio::config(GPIOA, 3, gpio::IN_PUSHPULL);
+        gpio::set(GPIOA, 3);
         gpio::set(GPIOA, 4);
         gpio::config(GPIOA, 4, gpio::OUT_PUSHPULL, gpio::SPEED_50MHZ);
         gpio::config(GPIOA, 5, gpio::AF_PUSHPULL, gpio::SPEED_50MHZ);
